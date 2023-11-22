@@ -39,7 +39,9 @@ python train.py --data_path [where your processed dataset is]
 ## Inference
 ~~~
 cd inference
-python infer_kitti_ins_allseq
+python infer_kitti_ins_allseq --input_path [downsample LiDAR scene path] --seq [Semantic-KITTI sequence] \
+--ckpt_path [checkpoint path] --save_path [where to save predict scene] \
+--frame_path [optional]
 ~~~
 
 ## Evaluation
