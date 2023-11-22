@@ -14,7 +14,7 @@ cd chamferdist/
 python setup.py install
 ~~~
 Note that chamfer distance calculation in chamferdist/chamferdist/chamfer.py should be modified if you followed the formulas like this.
-![image](https://github.com/willy8898/INS_ATT/assets/62001022/a09e52a3-e8cd-4ffc-9b3a-2758542cdb9d)
+![image](https://github.com/willy8898/INS_ATT/assets/62001022/1f5564f7-a3a8-4c0a-8c08-a1c3424c248d)
 
 ## Dataset preparation
 1. Downsample LiDAR scanning
@@ -58,7 +58,8 @@ python ins_voxel_iou_allseq
 ~~~
 
 ## Result comparison
-![image](https://github.com/willy8898/INS_ATT/assets/62001022/bda9296e-749b-492f-bc7f-966f7b1bef97)
+![image](https://github.com/willy8898/INS_ATT/assets/62001022/51e1b8bf-5539-4de2-bc04-7550379e68cd)
+
 
 
 
