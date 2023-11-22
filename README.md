@@ -47,6 +47,12 @@ python voxel_iou_allseq.py
 python ins_voxel_iou_allseq
 ~~~
 
+## Result comparison
+![image](https://github.com/willy8898/INS_ATT/assets/62001022/bda9296e-749b-492f-bc7f-966f7b1bef97)
+
+
+
+
 
 
 
