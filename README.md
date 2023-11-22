@@ -14,7 +14,7 @@ cd chamferdist/
 python setup.py install
 ~~~
 Note that chamfer distance calculation in chamferdist/chamferdist/chamfer.py should be modified if you followed the formulas like this.
-![image](https://github.com/willy8898/INS_ATT/assets/62001022/a09e52a3-e8cd-4ffc-9b3a-2758542cdb9d =300x)
+![image](https://github.com/willy8898/INS_ATT/assets/62001022/a09e52a3-e8cd-4ffc-9b3a-2758542cdb9d)
 
 ## Dataset preparation
 You should specify the folder contains the original [Semantic-KITTI](http://www.semantic-kitti.org/dataset.html) dataset and the processed dataset folder are.
