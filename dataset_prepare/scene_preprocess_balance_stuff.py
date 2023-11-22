@@ -1,20 +1,15 @@
 # OP: random extract patches from kitti scene(and also balanced with classes), 
 # then save them in npy files
-import time
+# contains code to have stuff class points for patch centers.
+# --> comment "thing clas section" and uncomment "stuff class section"
 import os
 from os.path import join
 from os import listdir
-from turtle import down
+import argparse
 import yaml
 import numpy as np
-import torch
 from sklearn.neighbors import KDTree, NearestNeighbors
 from tqdm import tqdm
-import sys
-sys.path.append('../')
-sys.path.append('../../')
-sys.path.append('../../code/')
-from pointnet2 import pointnet2_utils as pn2_utils
 import open3d
 
 
@@ -59,27 +54,22 @@ def extract_knn_patch(queries, pc, k, sem_label, ins_pred):
     k_inspred = np.take(ins_pred, knn_idx, axis=0) # M, K, C
     return k_patches, k_semlabel, k_inspred
 
-def seed_sampling(pc, patch_num_point=256, patch_num_ratio=3):
-    # FPS to get patch
-    seed1_num = int(pc.shape[0] / patch_num_point * patch_num_ratio)
-    
-    points = torch.from_numpy(np.expand_dims(pc, axis=0)).cuda() # 1, P, 3
-    upsampled_p_fps_id = pn2_utils.furthest_point_sample(points.contiguous(), seed1_num)
-    upsample_result_fps = pn2_utils.gather_operation(points.permute(0, 2, 1).contiguous(), upsampled_p_fps_id)
-    upsample_result_fps = (upsample_result_fps.permute(0,2,1).squeeze(0)).cpu().detach().numpy().astype(np.float32)
-    print("number of patches: %d" % upsample_result_fps.shape[0])
-
-    patches = extract_knn_patch(upsample_result_fps, pc, patch_num_point)
-
 
 if __name__ == '__main__':
-    #np.random.seed(0)
-    balance_classes = True
-    dense_path = '/media/1TB_SSD/Sem_Kitti/dataset/'
-    path = '/media/1TB_SSD/Sem_Kitti/down_dataset_32/'
-    #save_path = '/media/1TB_HDD/kitti_ins_balance/'
-    save_path = '/media/1TB_HDD/pugcn_style/'
-    in_R = 5.5 # meter
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dense_path', type=str, default='/media/1TB_SSD/Sem_Kitti/dataset/', help='where Semantic-KITTI dataset is')
+    parser.add_argument('--sparse_path', type=str, default='/media/1TB_SSD/Sem_Kitti/down_dataset_32/', help='where downsampled dataset is')
+    parser.add_argument('--save_path', type=str, default='/media/1TB_HDD/kitti_ins_aux_unify_background/', 
+                        help='saving processed dataset path')
+    parser.add_argument('--R', type=float, default=5.5, help='the patch radius in meter')
+    parser.add_argument('--balance', type=bool, default=True, help='if balanced classes')
+    args = parser.parse_args()
+
+    balance_classes = args.balance
+    dense_path = args.dense_path
+    path = args.sparse_path
+    save_path = args.save_path
+    in_R = args.R
 
     sequences = ['{:02d}'.format(i) for i in range(11)] # 0 ~ 10
 

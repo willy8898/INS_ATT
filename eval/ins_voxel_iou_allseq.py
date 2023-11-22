@@ -1,18 +1,15 @@
 # calculate voxel miou around instace
-import argparse
 import os
 from os.path import join, basename
 from glob import glob
-import time
 import argparse
-from tqdm import tqdm
 import yaml
-import numpy as np
-import torch
+import argparse
 
+import numpy as np
+from tqdm import tqdm
 from typing import Tuple
 from numba import njit
-
 
 # load Semantic KITTI class info
 with open("semantic-kitti.yaml", 'r') as stream:
@@ -79,32 +76,7 @@ def voxelize_jit(
                           (coor[:, 2] >= 0) & (coor[:, 2] < grid_size[2]))
     coor = coor[mask, ::-1]
     points_copy = points_copy[mask, :]
-    '''
-    points_copy = points_copy[mask]
-    assert points_copy.shape[0] == coor.shape[0]
 
-    coor_to_voxelidx = np.full((grid_size[2], grid_size[1], grid_size[0]), -1, dtype=np.int32)
-    voxels = np.zeros((max_num_voxels, max_points_in_voxel, points_copy.shape[-1]), dtype=points_copy.dtype)
-    coors = np.zeros((max_num_voxels, 3), dtype=np.int32)
-    num_points_per_voxel = np.zeros(shape=(max_num_voxels,), dtype=np.int32)
-
-    voxel_num = 0
-    for i, c in enumerate(coor):
-        voxel_id = coor_to_voxelidx[c[0], c[1], c[2]]
-        if voxel_id == -1:
-            voxel_id = voxel_num
-            if voxel_num > max_num_voxels:
-                continue
-            voxel_num += 1
-            coor_to_voxelidx[c[0], c[1], c[2]] = voxel_id
-            coors[voxel_id] = c
-        n_pts = num_points_per_voxel[voxel_id]
-        if n_pts < max_points_in_voxel:
-            voxels[voxel_id, n_pts] = points_copy[i]
-            num_points_per_voxel[voxel_id] += 1
-    
-    return voxels[:voxel_num], coors[:voxel_num], num_points_per_voxel[:voxel_num]
-    '''
     return coor, points_copy
 
 # https://stackoverflow.com/questions/8317022/get-intersecting-rows-across-two-2d-numpy-arrays
@@ -153,6 +125,22 @@ def miou(A, B):
     intersect = find_intersect(A, B)
     return len(intersect) / len(union)
 
+def precision(pred, gt):
+    #Precision = TP/(TP+FP) = intersect / Pred
+    intersect = find_intersect(pred, gt)
+    return len(intersect) / len(pred)
+
+def recall(pred, gt):
+    # Recall = TP/(TP+FN) = intersect / GT
+    intersect = find_intersect(pred, gt)
+    return len(intersect) / len(gt)
+
+def F1_score(Precision, Recall):
+    # F1-score = 2 * Precision * Recall / (Precision + Recall)
+    if (Precision + Recall) == 0:
+        return 0
+    return 2 * Precision * Recall / (Precision + Recall)
+
 
 ##################################################################################################################################
 # common point operations
@@ -186,19 +174,21 @@ def filter_radius(points: np.ndarray,
 ##################################################################################################################################
 
 if __name__ == '__main__':
-
-    ins_path = '/media/1TB_SSD/all_seq_result/'
-    gt_path = '/media/1TB_SSD/Sem_Kitti/dataset/sequences/'
-    #gt_path = '/media/1TB_SSD/Sem_Kitti/dataset/sequences/08/velodyne/'
-    #lbl_path = '/media/1TB_SSD/Sem_Kitti/dataset/sequences/08/labels/'
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--ins_path', type=str, default='/media/1TB_SSD/all_seq_result/', help='predict scene path')
+    parser.add_argument('--gt_path', type=str, default='/media/1TB_SSD/Sem_Kitti/dataset/sequences/', help='ground truth path')
+    args = parser.parse_args()
+    
+    ins_path = args.ins_path
+    gt_path = args.gt_path
 
     seqs = [str(i).zfill(2) for i in range(1, 11)] # 01 ~ 10
     #models = ['Ins_aux_result', 'npt_result', 'pugcn', 'mpu']
-    models = ['mpu']
+    models = ['Ins_aux_result']
     # filter condition
     radius = 50 # meter
     ins_out_range = 0.3
-    voxel_grid_size = 0.2
+    voxel_grid_size = 0.1
     voxel_size = np.array([voxel_grid_size, voxel_grid_size, voxel_grid_size])
     # 1: car, 2: bicycle, 3: motorcycle
     # 4: truck, 5: other-vehicle
@@ -214,6 +204,9 @@ if __name__ == '__main__':
             for class_i in Ins_sem:
                 require_sem = [class_i]        
                 ins_miou = 0
+                ins_prec = 0
+                ins_recall = 0
+                ins_f1 = 0
                 cnt = 0
                 for ins_i in tqdm(file_list, total=len(file_list)):
                     # read points
@@ -279,6 +272,13 @@ if __name__ == '__main__':
                             ins_miou_i = miou(unique_voxel_ins, unique_voxel_gt)
                             ins_miou += ins_miou_i
                             #print('ins_miou: ', ins_miou_i)
+                            ins_prec_i = precision(unique_voxel_ins, unique_voxel_gt)
+                            ins_prec += ins_prec_i
+                            ins_recall_i = recall(unique_voxel_ins, unique_voxel_gt)
+                            ins_recall += ins_recall_i
+                            ins_f1_i = F1_score(ins_prec_i, ins_recall_i)
+                            ins_f1 += ins_f1_i
+
                             cnt += 1
                             #np.savetxt('./ins.xyz', pt_ins, fmt='%.6f')
                             #np.savetxt('./gt.xyz', pt_gt, fmt='%.6f')
@@ -286,16 +286,32 @@ if __name__ == '__main__':
 
                 if cnt == 0:
                     ins_miou = 0
+                    ins_prec = 0
+                    ins_recall = 0
+                    ins_f1 = 0
                 else:
                     ins_miou = ins_miou / cnt
+                    ins_prec = ins_prec / cnt
+                    ins_recall = ins_recall / cnt
+                    ins_f1 = ins_f1 / cnt
 
-                print(f'Mean ins iou of {class_i}: {ins_miou}')
-                print(f'Total number of {class_i}: {cnt}')
-
-                txt_save_name = join(ins_path, seq, model+'_'+str(class_i)+'.txt')
-                with open(txt_save_name, 'w') as f:
-                    f.write(f'Mean ins iou of {class_i}: {ins_miou}\n')
-                    f.write(f'Total number of {class_i}: {cnt}')
+                    print(f'Mean ins iou of {class_i}: {ins_miou}')
+                    print(f'Mean ins precision of {class_i}: {ins_prec}')
+                    print(f'Mean ins recall of {class_i}: {ins_recall}')
+                    print(f'Mean ins F1-score of {class_i}: {ins_f1}')
+                    print(f'Total number of {class_i}: {cnt}')
+                    
+                    save_dir = join(ins_path, seq, 'vox_iou_0.1')
+                    if not os.path.exists(save_dir):
+                        os.makedirs(save_dir)
+                    #txt_save_name = join(ins_path, seq, model+'_'+str(class_i)+'.txt')
+                    txt_save_name = join(save_dir, model+'_'+str(class_i)+'.txt')
+                    with open(txt_save_name, 'w') as f:
+                        f.write(f'Mean ins iou of {class_i}: {ins_miou}\n')
+                        f.write(f'Mean ins precision of {class_i}: {ins_prec}\n')
+                        f.write(f'Mean ins recall of {class_i}: {ins_recall}\n')
+                        f.write(f'Mean ins F1-score of {class_i}: {ins_f1}\n')
+                        f.write(f'Total number of {class_i}: {cnt}')
  
 
 

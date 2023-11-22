@@ -1,22 +1,17 @@
 import os
 from os.path import join, basename
-import time
-import sys
-import argparse
-import random
-import yaml
 from glob import glob
+import time
+import yaml
+import argparse
+import sys
+sys.path.append('../')
+
 import numpy as np
 import torch
 from tqdm import tqdm
-sys.path.append('../')
-sys.path.append('../../')
-sys.path.append('../../code/')
+from sklearn.neighbors import NearestNeighbors
 
-from sklearn.neighbors import KDTree, NearestNeighbors
-
-######  The network and loss are figured out here  ###### 
-from chamferdist import ChamferDistance
 ###### ------ ######
 from network_ins_aux import Net_conpu_v7
 from pointnet2 import pointnet2_utils as pn2_utils
@@ -122,17 +117,7 @@ def inference(net, pc, lbl_info, patch_num_point=256, radius=5.5,
     return input_list, up_point_list
 
 def net_infer(net, input_list, xyzresult_folder):
-    ## choose random 100 frame
-    #s = [i for i in range(len(input_list))]
-    #random.shuffle(s)
-    #choose_frame = s[:100]
-    #print(choose_frame)
-    #print(len(input_list))
-    #raise ValueError
-
-    #for i in tqdm(choose_frame, total=len(choose_frame)):
     for xyz_file in tqdm(input_list, total=len(input_list)):
-        #xyz_file = input_list[i]
         # read point cloud file
         frame_points_ = np.fromfile(xyz_file, dtype=np.float32).reshape(-1, 4)
         frame_points = frame_points_[:, :3] # N, 3
@@ -172,32 +157,20 @@ def net_infer(net, input_list, xyzresult_folder):
 
 if __name__ == '__main__':    
     parser = argparse.ArgumentParser()
-    parser.add_argument('--device_id',help='Specify the index of the cuda device, e.g. 0, 1 ,2',default=0, type=int)
     parser.add_argument('--num_point', type=int, default=256,help='Point Number')
-    parser.add_argument('--gt_num_point', type=int, default=1024,help='Point Number of GT points')
     parser.add_argument('--training_up_ratio', type=int, default=4,help='The Upsampling Ratio during training') 
     parser.add_argument('--testing_up_ratio', type=int, default=4, help='The Upsampling Ratio during testing')  
     parser.add_argument('--over_sampling_scale', type=float, default=1.5, help='The scale for over-sampling')
     parser.add_argument('--emb_dims', type=int, default=512, metavar='N',help='Dimension of embeddings')
-    parser.add_argument('--testing_anchor_num', type=int, default=114, metavar='N',help='The number of patches on the testing models')
     parser.add_argument('--pe_out_L', type=int, default=5, metavar='N',help='The parameter L in the position code')
     parser.add_argument('--feature_unfolding_nei_num', type=int, default=4, metavar='N',help='The number of neighbour points used while feature unfolding')
-    parser.add_argument('--repulsion_nei_num', type=int, default=5, metavar='N',help='The number of neighbour points used in repulsion loss')
 
     # for phase train
-    parser.add_argument('--batchsize', type=int, default=8, help='Batch Size during training')
-    parser.add_argument('--max_epoch', type=int, default=100, help='Epoch to run')
-    parser.add_argument('--learning_rate', type=float, default=0.001)
     parser.add_argument('--if_bn', type=int, default=0, help='If using batch normalization')
     parser.add_argument('--neighbor_k', type=int, default=10, help='The number of neighbour points used in DGCNN')
     parser.add_argument('--mlp_fitting_str', type=str, default='256 128 64', metavar='None',help='mlp layers of the part surface fitting (default: None)')
-    parser.add_argument('--mlp_projecting_str', type=str, default='None', metavar='None',help='mlp layers of the part surface projecting (default: None)')
-    parser.add_argument('--glue_neighbor', type=int, default=4, help='The number of neighbour points used in glue process')
-    parser.add_argument('--proj_neighbor', type=int, default=4, help='The number of neighbour points used in projection process')
-
     parser.add_argument('--weight_decay',default=0.00005, type=float)
     parser.add_argument('--epsilon', type=float, default=1e-8)
-    parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
     parser.add_argument('--clip', type=float, default=1.0)
 
     # control the using mode
@@ -209,7 +182,7 @@ if __name__ == '__main__':
     parser.add_argument('--ckpt_path', type=str, default='result_inc_no_stuff/epoch_10_ckpt.pt',help='checkpoint path')
     parser.add_argument('--save_path', type=str, default='/media/1TB_SSD/all_seq_result/',help='xyz saving path')
     parser.add_argument('--seq', type=int, default=1, help='select sequence')
-    parser.add_argument('--frame_path', type=str, default='/home/gpl/Documents/NeuralPoints-INS_aux/model/select_frame/',help='select frame txt')
+    parser.add_argument('--frame_path', type=str, default='select_frame/',help='select frame txt')
     args = parser.parse_args()
 
     ## Load Model
@@ -217,12 +190,6 @@ if __name__ == '__main__':
     net = Net_conpu_v7(args).cuda()
     net.load_state_dict(checkpoint)
 
-    #seqs = [str(i).zfill(2) for i in range(1, 11)] # 01 ~ 10
-    #for seq in seqs:
-    #    xyzresult_folder = join(args.save_path, seq)
-    #    if not os.path.exists(xyzresult_folder):
-    #        os.mkdir(xyzresult_folder)
-    #for seq in seqs:
     seq = str(args.seq).zfill(2)
     result_folder = join(args.save_path, seq)
     if not os.path.exists(result_folder):
@@ -237,6 +204,7 @@ if __name__ == '__main__':
         os.mkdir(inputsave_folder)
     
     '''
+    # use selected frames
     # File list
     ## use select frame
     frame_file = join(args.frame_path, 'seq_'+seq+'.txt')
@@ -254,6 +222,7 @@ if __name__ == '__main__':
         #    break
     #print(input_list)
     '''
+
     input_list = sorted(glob(join(input_folder, '*.bin')))
     # net inference
     net_infer(net, input_list, xyzresult_folder)

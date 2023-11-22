@@ -1,22 +1,16 @@
 # OP: random extract patches from kitti scene(and also balanced with classes), 
 # then save them in npy files
-import time
+# only make instance class points to be centers
 import os
 from os.path import join
 from os import listdir
-from turtle import down
+import argparse
 import yaml
+
 import numpy as np
-import torch
+import open3d
 from sklearn.neighbors import KDTree, NearestNeighbors
 from tqdm import tqdm
-import sys
-sys.path.append('../')
-sys.path.append('../../')
-sys.path.append('../../code/')
-from pointnet2 import pointnet2_utils as pn2_utils
-import open3d
-
 
 # load Semantic KITTI class info
 with open("semantic-kitti.yaml", 'r') as stream:
@@ -59,29 +53,23 @@ def extract_knn_patch(queries, pc, k, sem_label, ins_pred):
     k_inspred = np.take(ins_pred, knn_idx, axis=0) # M, K, C
     return k_patches, k_semlabel, k_inspred
 
-def seed_sampling(pc, patch_num_point=256, patch_num_ratio=3):
-    # FPS to get patch
-    seed1_num = int(pc.shape[0] / patch_num_point * patch_num_ratio)
-    
-    points = torch.from_numpy(np.expand_dims(pc, axis=0)).cuda() # 1, P, 3
-    upsampled_p_fps_id = pn2_utils.furthest_point_sample(points.contiguous(), seed1_num)
-    upsample_result_fps = pn2_utils.gather_operation(points.permute(0, 2, 1).contiguous(), upsampled_p_fps_id)
-    upsample_result_fps = (upsample_result_fps.permute(0,2,1).squeeze(0)).cpu().detach().numpy().astype(np.float32)
-    print("number of patches: %d" % upsample_result_fps.shape[0])
-
-    patches = extract_knn_patch(upsample_result_fps, pc, patch_num_point)
-
-
 if __name__ == '__main__':
-    #np.random.seed(0)
-    balance_classes = True
-    dense_path = '/media/1TB_SSD/Sem_Kitti/dataset/'
-    #path = '/media/1TB_SSD/Sem_Kitti/down_dataset_32/'
-    path = '/media/1TB_SSD/Sem_Kitti/down_dataset_16/'
-    #save_path = '/media/1TB_HDD/kitti_ins_aux_unify_background/'
-    save_path = '/media/1TB_HDD/kitti_ins_aux_unify_background_16/'
-    in_R = 5.5 # meter
-    set = 'training'
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dense_path', type=str, default='/media/1TB_SSD/Sem_Kitti/dataset/', help='where Semantic-KITTI dataset is')
+    parser.add_argument('--sparse_path', type=str, default='/media/1TB_SSD/Sem_Kitti/down_dataset_32/', help='where downsampled dataset is')
+    parser.add_argument('--save_path', type=str, default='/media/1TB_HDD/kitti_ins_aux_unify_background/', 
+                        help='saving processed dataset path')
+    parser.add_argument('--R', type=float, default=5.5, help='the patch radius in meter')
+    parser.add_argument('--balance', type=bool, default=True, help='if balanced classes')
+    parser.add_argument('--set', type=str, default='training', help='choose between [training, validation, test]')
+    args = parser.parse_args()
+
+    balance_classes = args.balance
+    dense_path = args.dense_path
+    path = args.sparse_path
+    save_path = args.save_path
+    in_R = args.R
+    set = args.set
 
     # Get a list of sequences
     if set == 'training':
@@ -92,8 +80,7 @@ if __name__ == '__main__':
         sequences = ['{:02d}'.format(i) for i in range(11, 22)]
     else:
         raise ValueError('Unknown set for SemanticKitti data: ', set)
-    #sequences = ['00', '01', '02', '03', '04']
-    sequences = ['{:02d}'.format(i) for i in range(11) if i != 8]
+    #sequences = ['{:02d}'.format(i) for i in range(11) if i != 8]
 
     # List of all files in each sequence
     frames = []
@@ -173,16 +160,9 @@ if __name__ == '__main__':
                     not_thing_mask = np.where(not_thing_mask)[0]
                     ins_labels_final = ins_labels_shuffle.copy()
                     ins_labels_final[not_thing_mask] = 0
-                    #print(np.unique(ins_labels_final, return_counts=True))
-                    #print((ins_labels_final == ins_labels_shuffle).all())
 
                     # save the data
                     if ins_cnt_i > 1: # save the subscene if ins_num > 1 and its points should be more than one
-                        #print('saving....')
-                        #print(ins_cls)
-                        #print(ins_counts)
-                        #print(mask_inds.shape)
-                        #print(dense_mask_inds.shape)
                         point_cloud = open3d.geometry.PointCloud()
                         point_cloud.points = open3d.utility.Vector3dVector(new_points.squeeze())
                         open3d.io.write_point_cloud(join(save_path, 'subscene_xyz', seq, f'{seq}_{f_i}_{wanted_label}_{ins_i}.xyz'), point_cloud)
@@ -190,12 +170,6 @@ if __name__ == '__main__':
                         point_cloud.points = open3d.utility.Vector3dVector(dense_new_points)
                         open3d.io.write_point_cloud(join(save_path, 'subscene_xyz', seq, f'{seq}_{f_i}_{wanted_label}_{ins_i}_dense.xyz'), point_cloud)
 
-                        '''
-                        print(ins_labels_shuffle.shape)
-                        print(new_points.shape)
-                        print(dense_new_label.shape)
-                        print(dense_new_points.shape)
-                        '''
                         np.save(join(save_path, 'subscene', seq, f'{seq}_{f_i}_{wanted_label}_{ins_i}_scene.npy'), new_points)
                         np.save(join(save_path, 'label', seq, f'{seq}_{f_i}_{wanted_label}_{ins_i}_label.npy'), ins_labels_final)
                         np.save(join(save_path, 'label_origin', seq, f'{seq}_{f_i}_{wanted_label}_{ins_i}_label_origin.npy'), ins_labels_shuffle)
@@ -206,10 +180,3 @@ if __name__ == '__main__':
                 #raise ValueError('Stop')
 
         print(f'seqence {seq} has save {save_cnt} subscene..')
-    
-    #with open('wanted_lbl_cnt')
-
-            
-
-
-

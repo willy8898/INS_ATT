@@ -1,8 +1,4 @@
 import copy
-import sys
-sys.path.append('../')
-sys.path.append('../../')
-sys.path.append('../../code')
 
 import numpy as np
 import torch
@@ -13,7 +9,7 @@ from torch.autograd import grad
 
 from pointnet2 import pointnet2_utils as pn2_utils
 from attention_module import LocalTransformer, Feature_MLPNet_relu
-import torch_tensor_functions
+import code.torch_tensor_functions as torch_tensor_functions
 
 ######## TODO: START PART: FUNCTIONS ABOUT DGCNN. IT IS USED AS THE FEATURE EXTRACTOR IN OUR FRAMEWORK. ########
 #### The DGCNN network ####
@@ -214,7 +210,6 @@ class Net_conpu_v7(nn.Module):
         Input:
         - points_sparse: Patches xyz, (thisbatchsize, self.args.num_point, 3)
         - sem_info: Patches semantic prediction, (thisbatchsize, self.args.num_point, 1)
-        - range_info: Range and angle info, (thisbatchsize, self.args.num_point, 3)
         '''
 
         thisbatchsize = points_sparse.size()[0]

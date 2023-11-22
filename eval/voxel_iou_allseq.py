@@ -1,11 +1,10 @@
+# calculate voxel miou
 import os
 from os.path import join, basename
 from glob import glob
-import time
 import argparse
 from tqdm import tqdm
 import numpy as np
-import torch
 
 from typing import Tuple
 from numba import njit
@@ -38,9 +37,6 @@ def voxelize_jit(
     '''
     points_copy = points.copy()
     grid_size = np.floor((grid_range[3:] - grid_range[:3]) / voxel_size).astype(np.int32)
-
-    
-
     # assign voxel id to each point
     coor = np.floor((points_copy[:, :3] - grid_range[:3]) / voxel_size).astype(np.int32)
     # filter points that is outside the required grid range
@@ -48,32 +44,6 @@ def voxelize_jit(
                                          (coor[:, 1] >= 0) & (coor[:, 1] < grid_size[1])),
                           (coor[:, 2] >= 0) & (coor[:, 2] < grid_size[2]))
     coor = coor[mask, ::-1]
-    '''
-    points_copy = points_copy[mask]
-    assert points_copy.shape[0] == coor.shape[0]
-
-    coor_to_voxelidx = np.full((grid_size[2], grid_size[1], grid_size[0]), -1, dtype=np.int32)
-    voxels = np.zeros((max_num_voxels, max_points_in_voxel, points_copy.shape[-1]), dtype=points_copy.dtype)
-    coors = np.zeros((max_num_voxels, 3), dtype=np.int32)
-    num_points_per_voxel = np.zeros(shape=(max_num_voxels,), dtype=np.int32)
-
-    voxel_num = 0
-    for i, c in enumerate(coor):
-        voxel_id = coor_to_voxelidx[c[0], c[1], c[2]]
-        if voxel_id == -1:
-            voxel_id = voxel_num
-            if voxel_num > max_num_voxels:
-                continue
-            voxel_num += 1
-            coor_to_voxelidx[c[0], c[1], c[2]] = voxel_id
-            coors[voxel_id] = c
-        n_pts = num_points_per_voxel[voxel_id]
-        if n_pts < max_points_in_voxel:
-            voxels[voxel_id, n_pts] = points_copy[i]
-            num_points_per_voxel[voxel_id] += 1
-    
-    return voxels[:voxel_num], coors[:voxel_num], num_points_per_voxel[:voxel_num]
-    '''
     return coor
 
 # https://stackoverflow.com/questions/8317022/get-intersecting-rows-across-two-2d-numpy-arrays
@@ -119,6 +89,21 @@ def miou(A, B):
     intersect = find_intersect(A, B)
     return len(intersect) / len(union)
 
+def precision(pred, gt):
+    #Precision = TP/(TP+FP) = intersect / Pred
+    intersect = find_intersect(pred, gt)
+    return len(intersect) / len(pred)
+
+def recall(pred, gt):
+    # Recall = TP/(TP+FN) = intersect / GT
+    intersect = find_intersect(pred, gt)
+    return len(intersect) / len(gt)
+
+def F1_score(Precision, Recall):
+    # F1-score = 2 * Precision * Recall / (Precision + Recall)
+    if (Precision + Recall) == 0:
+        return 0
+    return 2 * Precision * Recall / (Precision + Recall)
 
 ##################################################################################################################################
 # common point operations
@@ -152,15 +137,19 @@ def filter_radius(points: np.ndarray,
 ##################################################################################################################################
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--ins_path', type=str, default='/media/1TB_SSD/all_seq_result/', help='predict scene path')
+    parser.add_argument('--gt_path', type=str, default='/media/1TB_SSD/Sem_Kitti/dataset/sequences/', help='ground truth path')
+    args = parser.parse_args()
     
-    ins_path = '/media/1TB_SSD/all_seq_result/'
-    gt_path = '/media/1TB_SSD/Sem_Kitti/dataset/sequences/'
+    ins_path = args.ins_path
+    gt_path = args.gt_path
 
     seqs = [str(i).zfill(2) for i in range(1, 11)] # 01 ~ 10
     #models = ['Ins_aux_result', 'npt_result', 'pugcn', 'mpu']
-    models = ['mpu']
+    models = ['Ins_aux_result']
     radius = 50 # meter
-    voxel_grid_size = 0.2
+    voxel_grid_size = 0.1
     voxel_size = np.array([voxel_grid_size, voxel_grid_size, voxel_grid_size])
     scene_range = np.array([-50, -50, -10, 50, 50, 10])
     
@@ -172,6 +161,10 @@ if __name__ == '__main__':
             file_list = sorted(glob(join(file_path, '*.xyz')))
         
             ins_miou = 0
+            ins_prec = 0
+            ins_recall = 0
+            ins_f1 = 0
+
             for ins_i in tqdm(file_list, total=len(file_list)):
                 ins = np.loadtxt(ins_i)
                 if model == 'npt_result':
@@ -201,13 +194,32 @@ if __name__ == '__main__':
                 # calculate miou: intersection / union
                 ins_miou_i = miou(unique_voxel_ins, unique_voxel_gt)
                 ins_miou += ins_miou_i
+                ins_prec_i = precision(unique_voxel_ins, unique_voxel_gt)
+                ins_prec += ins_prec_i
+                ins_recall_i = recall(unique_voxel_ins, unique_voxel_gt)
+                ins_recall += ins_recall_i
+                ins_f1_i = F1_score(ins_prec_i, ins_recall_i)
+                ins_f1 += ins_f1_i
 
             ins_miou = ins_miou / len(file_list)
+            ins_prec = ins_prec / len(file_list)
+            ins_recall = ins_recall / len(file_list)
+            ins_f1 = ins_f1 / len(file_list)
 
             print(f'Mean ins iou: {ins_miou}')
-            txt_save_name = join(ins_path, seq, model+'_allscene.txt')
+            print(f'Mean ins precision: {ins_prec}')
+            print(f'Mean ins recall: {ins_recall}')
+            print(f'Mean ins F1-score: {ins_f1}')
+            save_dir = join(ins_path, seq, 'vox_iou_0.1')
+            if not os.path.exists(save_dir):
+                os.makedirs(save_dir)
+            #txt_save_name = join(ins_path, seq, model+'_allscene.txt')
+            txt_save_name = join(save_dir, model+'_allscene.txt')
             with open(txt_save_name, 'w') as f:
-                f.write(f'Mean ins iou: {ins_miou}')
+                f.write(f'Mean ins iou: {ins_miou}\n')
+                f.write(f'Mean ins precision: {ins_prec}\n')
+                f.write(f'Mean ins recall: {ins_recall}\n')
+                f.write(f'Mean ins F1-score: {ins_f1}\n')
 
 
 

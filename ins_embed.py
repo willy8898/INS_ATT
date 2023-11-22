@@ -155,7 +155,6 @@ def discriminative_loss(input, target, n_objects,
     alpha = beta = 1.0
     gamma = 0.001
 
-    #bs, n_filters, height, width = input.size()
     bs, num_point, n_filters = input.size()
     n_instances = target.size(1)
 
@@ -166,7 +165,7 @@ def discriminative_loss(input, target, n_objects,
     #print(target.shape)
     cluster_means = calculate_means(
         input, target, n_objects, max_n_objects, usegpu)
-    #print(cluster_means.shape)
+
     var_term = calculate_variance_term(
         input, target, cluster_means, n_objects, delta_v, norm)
     dist_term = calculate_distance_term(

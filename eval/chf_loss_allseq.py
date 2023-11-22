@@ -1,9 +1,7 @@
-# calculate voxel miou around instace
-
+# calculate chamfer distance
 import os
 from os.path import join, basename
 from glob import glob
-import time
 import argparse
 from tqdm import tqdm
 import yaml
@@ -13,9 +11,6 @@ import torch
 from typing import Tuple
 from numba import njit
 from chamferdist import ChamferDistance
-# pytorch3d version
-#from chamfer_distance.chamfer_distance import ChamferDistance
-#import point_cloud_utils as pcu
 
 # load Semantic KITTI class info
 with open("semantic-kitti.yaml", 'r') as stream:
@@ -46,7 +41,7 @@ with open("semantic-kitti.yaml", 'r') as stream:
         learning_map_inv[k] = v
 
 ##################################################################################################################################
-# voxel miou utility
+# chamfer distance utility
 ##################################################################################################################################
 
 # https://github.com/danielhavir/voxelize3d
@@ -140,20 +135,23 @@ def filter_radius(points: np.ndarray,
 ##################################################################################################################################
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--ins_path', type=str, default='/media/1TB_SSD/all_seq_result/', help='predict scene path')
+    parser.add_argument('--gt_path', type=str, default='/media/1TB_SSD/Sem_Kitti/dataset/sequences/', help='ground truth path')
+    args = parser.parse_args()
     
-    ins_path = '/media/1TB_SSD/all_seq_result/'
-    gt_path = '/media/1TB_SSD/Sem_Kitti/dataset/sequences/'
+    ins_path = args.ins_path
+    gt_path = args.gt_path
 
     seqs = [str(i).zfill(2) for i in range(1, 11)] # 01 ~ 10
-    models = ['Ins_aux_result', 'npt_result', 'pugcn', 'mpu']
-    #models = ['Ins_aux_result']
+    #models = ['Ins_aux_result', 'npt_result', 'pugcn', 'mpu']
+    models = ['Ins_aux_result']
     radius = 50 # meter
-    voxel_grid_size = 0.2
-    voxel_size = np.array([voxel_grid_size, voxel_grid_size, voxel_grid_size])
+    voxel_grid_size = 0.1 # no use here
+    voxel_size = np.array([voxel_grid_size, voxel_grid_size, voxel_grid_size]) # no use here
     scene_range = np.array([-50, -50, 0.5, 50, 50, 10])
     # road: 9 ~ 12
     road_cls = [9, 10, 11, 12]
-    
 
     for seq in seqs:
         for model in models:
@@ -188,7 +186,7 @@ if __name__ == '__main__':
                 #print(ins_points.shape)
                 #print(gt_points.shape)
 
-                # remove road plane
+                # remove road plane (average height)
                 all_road_z = np.zeros((0))
                 for sem_cls in road_cls:
                     sem_mask_gt = np.where(sem_lbl == sem_cls)[0]
