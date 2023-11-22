@@ -19,8 +19,13 @@ Note that chamfer distance calculation in chamferdist/chamferdist/chamfer.py sho
 ## Dataset preparation
 You should specify the folder contains the original [Semantic-KITTI](http://www.semantic-kitti.org/dataset.html) dataset and the processed dataset folder are.
 ~~~
+# downsample LiDAR scene
+cd LiDAR_down
+python downsample2_lidarspec.py
+# prepare the training set
 cd dataset_prepare
-python scene_preprocess.py
+python scene_preprocess.py --dense_path [Semantic-KITTI folder] --sparse_path [downsample dataset folder] \
+--save_path [where you want to save your patches training set]
 ~~~
 
 ## Training
