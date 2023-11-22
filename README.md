@@ -25,7 +25,7 @@ python scene_preprocess.py
 
 ## Training
 ~~~
-python train.py
+python train.py --data_path [where your processed dataset is]
 ~~~
 
 ## Inference
