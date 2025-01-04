@@ -1,5 +1,5 @@
 # INS_ATT
-- [my paper](https://drive.google.com/file/d/1mbzbklIiPpAH9ou-uSGQ-ZHn1ddJrMlL/view?usp=sharing)
+- [paper](https://ieeexplore.ieee.org/abstract/document/10801358)
 ## Installation
 I borrow codes from [NPT](https://github.com/WanquanF/NeuralPoints), [chamferdist](https://github.com/krrish94/chamferdist), [instance-segmentation-pytorch](https://github.com/Wizaron/instance-segmentation-pytorch) and [Pointformer](https://github.com/Vladimir2506/Pointformer).
 1. I assume that you have installed pytorch with corresponding torchvision and cudatoolkit.
