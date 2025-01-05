@@ -1,5 +1,5 @@
 # INS_ATT
-- [paper](https://ieeexplore.ieee.org/abstract/document/10801358)
+- [paper: Enhancing LiDAR Scene Upsampling with Instance-aware Feature-embedding and Attention Mechanism, IEEE IROS 2024](https://ieeexplore.ieee.org/abstract/document/10801358)
 - [Demo Video](https://youtu.be/YuW5Uj0g1kE?si=rY1c12VkL5GKh5Be)
 ## Installation
 I borrow codes from [NPT](https://github.com/WanquanF/NeuralPoints), [chamferdist](https://github.com/krrish94/chamferdist), [instance-segmentation-pytorch](https://github.com/Wizaron/instance-segmentation-pytorch) and [Pointformer](https://github.com/Vladimir2506/Pointformer).
